@@ -24,6 +24,7 @@ import imp
 import logging
 import os
 import re
+import subprocess
 
 from airflow.exceptions import AirflowException
 
@@ -145,3 +146,73 @@ def chain(*tasks):
     """
     for up_task, down_task in zip(tasks[:-1], tasks[1:]):
         up_task.set_downstream(down_task)
+
+
+def popen_and_tail(cmd, shell=False):
+    '''
+    Run a command in subprocess, being able to tail stdout and stderr at the
+    same time.
+
+    Return constructed Popen instance, and a tailer function, which helps to
+    interactive with output from stdout and stderr.
+
+    Signature of returned tailer functions is as follows,
+    def tailer(stdout_callback=None, stderr_callback=None, heartbeat=None)
+
+    stdout_callback will be invoked when stdout got new output
+    stderr_callback will be invoked when stderr got new output
+    heartbeat will be invoked when each Popen polling iteration
+    '''
+    sp = subprocess.Popen(
+        cmd,
+        shell=shell,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+
+    def tail(sp, stdout_callback=None, stderr_callback=None, heartbeat=None):
+        from fcntl import fcntl, F_GETFL, F_SETFL
+
+        stdout = []
+        stderr = []
+        stdout_line = ''
+        stderr_line = ''
+        return_code = None
+
+        def set_nonblock(fd):
+            flags = fcntl(fd, F_GETFL)
+            fcntl(fd, F_SETFL, flags | os.O_NONBLOCK)
+
+        def readline(fileno, bufsize, consume):
+            try:
+                line = os.read(fileno, bufsize)
+            except OSError as e:
+                # readline might be invoked before fd initialized, which
+                # cause to raise OSError: Resource temporarily unavailable
+                line = None
+            return consume(line)
+
+        def consume_line(line, lines, callback):
+            if line:
+                lines.append(line)
+                if callback is not None:
+                    callback(line)
+            return line
+
+        set_nonblock(sp.stdout)
+        set_nonblock(sp.stderr)
+
+        while return_code is None or stdout_line or stderr_line:
+            return_code = sp.poll()
+            stdout_line = readline(sp.stdout.fileno(), 512,
+                lambda line: consume_line(line, stdout, stdout_callback))
+            stderr_line = readline(sp.stderr.fileno(), 512,
+                lambda line: consume_line(line, stderr, stderr_callback))
+            if heartbeat:
+                heartbeat()
+
+        return return_code, ''.join(stdout), ''.join(stderr)
+
+    def tailer(stdout_callback=None, stderr_callback=None, heartbeat=None):
+        return tail(sp, stdout_callback, stderr_callback, heartbeat)
+
+    return sp, tailer
