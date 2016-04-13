@@ -237,3 +237,72 @@ class GCSLog(object):
             bucket = parsed_url.netloc
             blob = parsed_url.path.strip('/')
             return (bucket, blob)
+
+
+class HDFSLog(object):
+    """
+    Utility class for reading and writing logs in HDFS.
+    Requires airflow[hdfs] and setting the REMOTE_BASE_LOG_FOLDER and
+    REMOTE_LOG_CONN_ID configuration options in airflow.cfg.
+    """
+    def __init__(self):
+        remote_conn_id = configuration.get('core', 'REMOTE_LOG_CONN_ID')
+        try:
+            from airflow.hooks import HDFSCliHook
+            self.hook = HDFSCliHook(remote_conn_id)
+        except:
+            self.hook = None
+            logging.error(
+                'Could not create an HDFSHook with connection id "{}". '
+                'Please make sure that airflow[hdfs] is installed and '
+                'the HDFS Cli connection exists.'.format(remote_conn_id))
+
+    def read(self, remote_log_location, return_error=False):
+        """
+        Returns the log found at the remote_log_location. Returns '' if no
+        logs are found or there is an error.
+
+        :param remote_log_location: the log's location in remote storage
+        :type remote_log_location: string (path)
+        :param return_error: if True, returns a string error message if an
+            error occurs. Otherwise returns '' when an error occurs.
+        :type return_error: bool
+        """
+        if self.hook:
+            try:
+                lines = self.hook.text(remote_log_location)
+                return lines
+            except AirflowException as err:
+                err_msg = 'Could not read logs from {}, details: {}'.format(
+                    remote_log_location, err[1])
+                logging.error(err_msg)
+                return err_msg if return_error else ''
+            err_msg = 'Could not read logs from {}'.format(remote_log_location)
+            logging.error(err_msg)
+
+    def write(self, log, remote_log_location, append=False):
+        """
+        Writes the log to the remote_log_location. Fails silently if no hook
+        was created.
+
+        :param log: the log to write to the remote_log_location
+        :type log: string
+        :param remote_log_location: the log's location in remote storage
+        :type remote_log_location: string (path)
+        :param append: if False, any existing log file is overwritten. If True,
+            the new log is appended to any existing logs.
+        :type append: bool
+
+        """
+        if self.hook:
+            if append:
+                self.hook.appendText(log, remote_log_location)
+                return
+            else:
+                self.hook.writeText(log, remote_log_location)
+                return
+            except:
+                pass
+
+        # raise/return error if we get here
+        logging.error('Could not write logs to {}'.format(remote_log_location))
