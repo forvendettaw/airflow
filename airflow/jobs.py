@@ -1073,10 +1073,7 @@ class SchedulerJob(BaseJob):
         """
         for dag in dags:
             dag = dagbag.get_dag(dag.dag_id)
-            if dag.reached_max_runs:
-                self.logger.info("Not processing DAG {} since its max runs has been reached"
-                                .format(dag.dag_id))
-                continue
+            
             if dag.is_paused:
                 self.logger.info("Not processing DAG {} since it's paused"
                                  .format(dag.dag_id))
@@ -1089,9 +1086,13 @@ class SchedulerJob(BaseJob):
 
             self.logger.info("Processing {}".format(dag.dag_id))
 
-            dag_run = self.create_dag_run(dag)
-            if dag_run:
-                self.logger.info("Created {}".format(dag_run))
+            if dag.reached_max_runs:
+                self.logger.info("Not processing DAG {} since its max runs has been reached"
+                                .format(dag.dag_id))
+            else:
+                dag_run = self.create_dag_run(dag)
+                if dag_run:
+                    self.logger.info("Created {}".format(dag_run))
             self._process_task_instances(dag, tis_out)
             self.manage_slas(dag)
 
