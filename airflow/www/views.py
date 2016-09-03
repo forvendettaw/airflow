@@ -716,6 +716,10 @@ class Airflow(BaseView):
     @login_required
     @wwwutils.action_logging
     def log(self):
+        try:
+            REMOTE_LOG_SERVER = conf.get('core', 'REMOTE_LOG_SERVER')
+        except:
+            REMOTE_LOG_SERVER = None
         BASE_LOG_FOLDER = os.path.expanduser(
             conf.get('core', 'BASE_LOG_FOLDER'))
         dag_id = request.args.get('dag_id')
@@ -724,6 +728,9 @@ class Airflow(BaseView):
         dag = dagbag.get_dag(dag_id)
         log_relative = "{dag_id}/{task_id}/{execution_date}".format(
             **locals())
+        log_url = "{log_server}/{log_relative}".format(
+            log_server=REMOTE_LOG_SERVER, log_relative=log_relative) \
+            if REMOTE_LOG_SERVER else None
         loc = os.path.join(BASE_LOG_FOLDER, log_relative)
         loc = loc.format(**locals())
         log = ""
@@ -794,8 +801,8 @@ class Airflow(BaseView):
 
         return self.render(
             'airflow/ti_code.html',
-            code=log, dag=dag, title=title, task_id=task_id,
-            execution_date=execution_date, form=form)
+            code_url=log_url, code=log, dag=dag, title=title,
+            task_id=task_id, execution_date=execution_date, form=form)
 
     @expose('/task')
     @login_required

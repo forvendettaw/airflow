@@ -24,8 +24,12 @@
     {% if html_code %}
         {{ html_code|safe }}
     {% endif %}
-    {% if code %}
-        <pre>{{ code }}</pre>
+    {% if code and code_url %}
+        <pre class="code" data-url="{{ code_url }}">{{ code }}</pre>
+    {% elif code %}
+        <pre class="code">{{ code }}</pre>
+    {% elif code_url %}
+        <pre class="code" data-url="{{ code_url }}"></pre>
     {% endif %}
 
     {% if code_dict %}
