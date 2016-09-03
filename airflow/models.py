@@ -756,10 +756,8 @@ class TaskInstance(Base):
         dag = self.task.dag
 
         should_pass_filepath = not pickle_id and dag
-        if should_pass_filepath and dag.full_filepath != dag.filepath:
+        if should_pass_filepath:
             path = "DAGS_FOLDER/{}".format(dag.filepath)
-        elif should_pass_filepath and dag.full_filepath:
-            path = dag.full_filepath
         else:
             path = None
 
