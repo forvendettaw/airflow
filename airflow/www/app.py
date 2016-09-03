@@ -14,8 +14,9 @@
 #
 import socket
 
-from flask import Flask
-from flask_admin import Admin, base
+from flask import Flask, Blueprint
+from flask_admin import Admin, base, BaseView
+from flask_admin.menu import MenuLink
 from flask_cache import Cache
 from flask_wtf.csrf import CsrfProtect
 
@@ -108,12 +109,21 @@ def create_app(config=None):
             """Integrate plugins to the context"""
             from airflow.plugins_manager import (
                 admin_views, flask_blueprints, menu_links)
-            for v in admin_views:
-                admin.add_view(v)
-            for bp in flask_blueprints:
-                app.register_blueprint(bp)
-            for ml in sorted(menu_links, key=lambda x: x.name):
-                admin.add_link(ml)
+            for vmod in admin_views:
+                for vname in dir(vmod):
+                    v = vmod.__dict__[vname]
+                    if isinstance(v, BaseView):
+                        admin.add_view(v)
+            for bpmod in flask_blueprints:
+                for bpname in dir(bpmod):
+                    bp = bpmod.__dict__[bpname]
+                    if isinstance(bp, Blueprint):
+                        app.register_blueprint(bp)
+            for mlmod in menu_links:
+                for mlname in dir(mlmod):
+                    ml = mlmod.__dict__[mlname]
+                    if isinstance(ml, MenuLink):
+                        admin.add_link(ml)
 
         integrate_plugins()
 
