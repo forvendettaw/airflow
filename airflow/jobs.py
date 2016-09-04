@@ -42,7 +42,7 @@ from tabulate import tabulate
 from airflow import executors, models, settings
 from airflow import configuration as conf
 from airflow.exceptions import AirflowException
-from airflow.models import DagRun
+from airflow.models import DagRun, DAGS_FOLDER
 from airflow.settings import Stats
 from airflow.ti_deps.dep_context import RUN_DEPS, DepContext
 from airflow.utils.state import State
@@ -1009,6 +1009,9 @@ class SchedulerJob(BaseJob):
                                              task_concurrency_limit))
                     continue
 
+                dag_relative_filepath = os.path.relpath(
+                    simple_dag_bag.get_dag(task_instance.dag_id).full_filepath,
+                    DAGS_FOLDER)
                 command = TI.generate_command(
                     task_instance.dag_id,
                     task_instance.task_id,
@@ -1020,8 +1023,7 @@ class SchedulerJob(BaseJob):
                     ignore_task_deps=False,
                     ignore_ti_state=False,
                     pool=task_instance.pool,
-                    file_path='DAGS_FOLDER/{}'.format(
-                        simple_dag_bag.get_dag(task_instance.dag_id).filepath),
+                    file_path='DAGS_FOLDER/{}'.format(dag_relative_filepath),
                     pickle_id=simple_dag_bag.get_dag(task_instance.dag_id).pickle_id)
 
                 priority = task_instance.priority_weight
