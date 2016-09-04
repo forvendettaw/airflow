@@ -3781,7 +3781,7 @@ class DagRun(Base):
             elif unfinished_tasks and none_depends_on_past and no_dependencies_met:
                 logging.info(
                     'Deadlock; marking run {} failed'.format(self))
-                self.state = State.FAILED
+                # self.state = State.FAILED
 
             # finally, if the roots aren't done, the dag is still running
             else:
